@@ -59,6 +59,9 @@
   .chip b { font-weight: 700; }
   .chip.neg { background: rgba(0,0,0,.22); }
 
+  .offline-status { text-align: center; font-size: 12px; margin: 10px 0 0; color: var(--gris); min-height: 16px; }
+  .offline-status.ok { color: #0a7d33; font-weight: 600; }
+
   .wrap { padding: 16px; max-width: 640px; margin: 0 auto; }
 
   .card { background: var(--card); border-radius: 16px; box-shadow: var(--sombra); margin-bottom: 16px; overflow: hidden; }
@@ -207,6 +210,7 @@
   <p style="text-align:center; color:var(--gris); font-size:12px; margin-top:24px">
     Los datos se guardan solo en este dispositivo · <span id="version">v1</span>
   </p>
+  <div id="offlineStatus" class="offline-status"></div>
 </div>
 
 <button class="fab" onclick="abrirModal()">＋ Añadir gasto</button>
@@ -584,7 +588,13 @@ render();
 // Registrar el service worker (solo funciona servido por http/https, no en file://)
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+    const el = document.getElementById("offlineStatus");
+    navigator.serviceWorker.register("sw.js").then(() => {
+      if (el) el.textContent = "Preparando modo sin conexión…";
+      return navigator.serviceWorker.ready;
+    }).then(() => {
+      if (el) { el.textContent = "✓ Lista para usar sin conexión"; el.classList.add("ok"); }
+    }).catch(() => { /* file:// o navegador sin soporte: no mostramos nada */ });
   });
 }
 </script>
