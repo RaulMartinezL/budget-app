@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#bc002d">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gastos Japón">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Gastos Japón 🇯🇵</title>
+<style>
+  :root {
+    --rojo: #bc002d;
+    --rojo-suave: #f6e3e7;
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --texto: #1c1c1e;
+    --gris: #8a8a8e;
+    --borde: #e5e5ea;
+    --verde: #34c759;
+    --sombra: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--texto);
+    padding-bottom: 90px;
+  }
+  header {
+    background: var(--rojo);
+    color: #fff;
+    padding: 18px 20px calc(18px + env(safe-area-inset-top)) 20px;
+    padding-top: calc(18px + env(safe-area-inset-top));
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { margin: 0; font-size: 20px; font-weight: 700; }
+  header .sub { font-size: 13px; opacity: .85; margin-top: 2px; }
+
+  .resumen {
+    background: var(--rojo);
+    color: #fff;
+    padding: 0 20px 20px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .fila-boxes { display: flex; gap: 12px; }
+  .resumen .box { flex: 1; background: rgba(255,255,255,.15); border-radius: 14px; padding: 12px; }
+  .resumen .box .label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; opacity: .85; }
+  .resumen .box .val { font-size: 20px; font-weight: 700; margin-top: 4px; }
+  .resumen .box .val small { font-size: 12px; opacity: .8; font-weight: 500; }
+  .resumen .box .mini { font-size: 12px; opacity: .8; margin-top: 3px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips:empty { display: none; }
+  .chip { background: rgba(255,255,255,.15); border-radius: 20px; padding: 6px 12px; font-size: 12px; }
+  .chip b { font-weight: 700; }
+  .chip.neg { background: rgba(0,0,0,.22); }
+
+  .wrap { padding: 16px; max-width: 640px; margin: 0 auto; }
+
+  .card { background: var(--card); border-radius: 16px; box-shadow: var(--sombra); margin-bottom: 16px; overflow: hidden; }
+  .card h2 { font-size: 14px; margin: 0; padding: 14px 16px 10px; color: var(--gris); text-transform: uppercase; letter-spacing: .5px; }
+
+  .barra-cat { padding: 4px 16px 14px; }
+  .cat-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+  .cat-row .emoji { font-size: 20px; width: 26px; text-align: center; }
+  .cat-row .nombre { flex: 1; font-size: 14px; }
+  .cat-row .cifra { font-weight: 600; font-size: 14px; }
+  .cat-row .bar { height: 6px; border-radius: 3px; background: var(--rojo); margin-top: 3px; }
+  .cat-row .barbg { flex: 2; }
+
+  .lista .item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; border-top: 1px solid var(--borde); cursor: pointer;
+  }
+  .lista .item:active { background: var(--bg); }
+  .lista .item:first-child { border-top: none; }
+  .lista .emoji { font-size: 24px; width: 32px; text-align: center; }
+  .lista .info { flex: 1; min-width: 0; }
+  .lista .info .concepto { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lista .info .meta { font-size: 12px; color: var(--gris); margin-top: 2px; }
+  .lista .info .meta .ef { color: #0a7d33; font-weight: 600; }
+  .lista .montos { text-align: right; }
+  .lista .montos .yen { font-weight: 700; font-size: 15px; }
+  .lista .montos .eur { font-size: 12px; color: var(--gris); }
+  .lista .del { background: none; border: none; color: var(--gris); font-size: 20px; padding: 4px 8px; cursor: pointer; }
+
+  .vacio { padding: 32px 16px; text-align: center; color: var(--gris); font-size: 14px; }
+
+  /* Botón flotante añadir */
+  .fab {
+    position: fixed; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+    background: var(--rojo); color: #fff; border: none;
+    font-size: 16px; font-weight: 700; padding: 15px 28px; border-radius: 30px;
+    box-shadow: 0 4px 16px rgba(188,0,45,.4); cursor: pointer; z-index: 20;
+  }
+
+  /* Modal */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; align-items: flex-end; z-index: 30; }
+  .overlay.abierto { display: flex; }
+  .modal {
+    background: var(--card); width: 100%; max-width: 640px; margin: 0 auto;
+    border-radius: 20px 20px 0 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+    animation: subir .22s ease; max-height: 92vh; overflow-y: auto;
+  }
+  @keyframes subir { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal h3 { margin: 0 0 16px; font-size: 18px; }
+
+  label { display: block; font-size: 13px; color: var(--gris); margin: 12px 0 5px; font-weight: 600; }
+  input, select {
+    width: 100%; padding: 13px; border: 1px solid var(--borde); border-radius: 12px;
+    font-size: 16px; background: #fff; color: var(--texto); font-family: inherit;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--rojo); }
+
+  .cats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 6px; }
+  .cat-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 4px; border: 1px solid var(--borde); border-radius: 12px;
+    cursor: pointer; font-size: 11px; background: #fff; text-align: center;
+  }
+  .cat-chip .e { font-size: 22px; }
+  .cat-chip.sel { border-color: var(--rojo); background: var(--rojo-suave); color: var(--rojo); font-weight: 600; }
+
+  .btn-row { display: flex; gap: 10px; margin-top: 20px; }
+  .btn { flex: 1; padding: 14px; border-radius: 12px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .btn-primary { background: var(--rojo); color: #fff; }
+  .btn-sec { background: var(--borde); color: var(--texto); }
+
+  .conv-hint { font-size: 13px; color: var(--verde); font-weight: 600; margin-top: 6px; min-height: 18px; }
+
+  .moneda-toggle { display: flex; gap: 8px; margin: 6px 0 4px; }
+  .moneda-toggle .mon {
+    flex: 1; padding: 11px; border: 1px solid var(--borde); border-radius: 12px;
+    background: #fff; font-size: 15px; font-weight: 700; cursor: pointer; color: var(--texto);
+  }
+  .moneda-toggle .mon.sel { border-color: var(--rojo); background: var(--rojo-suave); color: var(--rojo); }
+
+  /* Config */
+  .config-fila { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--borde); }
+  .config-fila:first-of-type { border-top: none; }
+  .config-fila label { margin: 0; flex: 1; color: var(--texto); font-weight: 500; font-size: 15px; }
+  .config-fila input { width: 130px; }
+  .config-fila input[type="date"] { width: 160px; }
+  .linkbtn { background: none; border: none; color: var(--rojo); font-size: 14px; font-weight: 600; padding: 12px 16px; cursor: pointer; width: 100%; text-align: left; border-top: 1px solid var(--borde); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🇯🇵 Gastos Japón</h1>
+  <div class="sub" id="subtitulo">Tu viaje</div>
+</header>
+
+<div class="resumen">
+  <div class="fila-boxes">
+    <div class="box">
+      <div class="label">Gastado total</div>
+      <div class="val"><span id="totalBig">0 €</span> <small id="totalSmall">¥0</small></div>
+    </div>
+    <div class="box">
+      <div class="label">Media / día</div>
+      <div class="val" id="mediaDia">0 €</div>
+      <div class="mini" id="mediaDiaSmall"></div>
+    </div>
+  </div>
+  <div class="chips" id="chipsResumen"></div>
+</div>
+
+<div class="wrap">
+
+  <div class="card" id="cardCategorias" style="display:none">
+    <h2>Por categoría</h2>
+    <div class="barra-cat" id="barraCat"></div>
+  </div>
+
+  <div class="card">
+    <h2>Movimientos</h2>
+    <div class="lista" id="lista"></div>
+  </div>
+
+  <div class="card">
+    <h2>Ajustes</h2>
+    <div class="config-fila">
+      <label for="cfgInicio">🗓️ Inicio del viaje</label>
+      <input type="date" id="cfgInicio">
+    </div>
+    <div class="config-fila">
+      <label for="cfgFin">🗓️ Fin del viaje</label>
+      <input type="date" id="cfgFin">
+    </div>
+    <div class="config-fila">
+      <label for="cfgRate">Cambio por defecto · 1 € =</label>
+      <input type="number" id="cfgRate" inputmode="decimal" step="0.1"> <span style="font-weight:600">¥</span>
+    </div>
+    <div class="config-fila">
+      <label for="cfgPresu">Presupuesto (€)</label>
+      <input type="number" id="cfgPresu" inputmode="decimal" placeholder="opcional">
+    </div>
+    <button class="linkbtn" onclick="exportarCSV()">📤 Exportar a CSV</button>
+    <button class="linkbtn" onclick="borrarTodo()" style="color:#8a8a8e">🗑️ Borrar todos los gastos</button>
+  </div>
+
+  <p style="text-align:center; color:var(--gris); font-size:12px; margin-top:24px">
+    Los datos se guardan solo en este dispositivo · <span id="version">v1</span>
+  </p>
+</div>
+
+<button class="fab" onclick="abrirModal()">＋ Añadir gasto</button>
+
+<!-- Modal añadir -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3>Nuevo gasto</h3>
+
+    <label>Importe</label>
+    <div class="moneda-toggle">
+      <button type="button" id="btnYen" class="mon sel" onclick="setMoneda('yen')">¥ Yenes</button>
+      <button type="button" id="btnEur" class="mon" onclick="setMoneda('eur')">€ Euros</button>
+    </div>
+    <input type="number" id="inpMonto" inputmode="decimal" placeholder="0" autocomplete="off">
+    <div class="conv-hint" id="convHint"></div>
+
+    <label for="inpRate">Cambio de este gasto · 1 € = <span style="font-weight:400;color:var(--gris)">(¥, por defecto el de hoy)</span></label>
+    <input type="number" id="inpRate" inputmode="decimal" step="0.1">
+
+    <label>Categoría</label>
+    <div class="cats-grid" id="catsGrid"></div>
+
+    <label for="inpConcepto">Concepto (opcional)</label>
+    <input type="text" id="inpConcepto" placeholder="Ramen, tren, entrada...">
+
+    <label>Método de pago</label>
+    <div class="moneda-toggle">
+      <button type="button" id="btnTarjeta" class="mon sel" onclick="setPago('tarjeta')">💳 Tarjeta</button>
+      <button type="button" id="btnEfectivo" class="mon" onclick="setPago('efectivo')">💵 Efectivo</button>
+    </div>
+
+    <label for="inpFecha">Fecha</label>
+    <input type="date" id="inpFecha">
+
+    <div class="btn-row">
+      <button class="btn btn-sec" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarGasto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ---- Categorías (estilo TravelSpend) ----
+const CATEGORIAS = [
+  { id: "comida",     emoji: "🍜", nombre: "Comida" },
+  { id: "vuelos",     emoji: "✈️", nombre: "Vuelos" },
+  { id: "transporte", emoji: "🚆", nombre: "Transporte" },
+  { id: "aloja",      emoji: "🏨", nombre: "Alojamiento" },
+  { id: "compras",    emoji: "🛍️", nombre: "Compras" },
+  { id: "activid",    emoji: "⛩️", nombre: "Actividades" },
+  { id: "souvenir",   emoji: "🎁", nombre: "Souvenirs" },
+  { id: "bebida",     emoji: "🍶", nombre: "Bebida" },
+  { id: "otros",      emoji: "💴", nombre: "Otros" },
+];
+const catById = id => CATEGORIAS.find(c => c.id === id) || CATEGORIAS[CATEGORIAS.length - 1];
+
+// Costes fijos: cuentan en total/presupuesto pero NO en la media por día
+const CAT_FIJAS = ["vuelos", "aloja"];
+const esFijo = g => CAT_FIJAS.includes(g.cat);
+
+// ---- Estado / persistencia ----
+const LS_GASTOS = "gastosJapon.gastos";
+const LS_CFG = "gastosJapon.config";
+
+let gastos = cargar(LS_GASTOS, []);
+let cfg = cargar(LS_CFG, { rate: 170, presupuesto: null, inicio: null, fin: null });
+let catSeleccionada = "comida";
+let monedaSel = "yen"; // moneda con la que se introduce el gasto en el modal
+let pagoSel = "tarjeta"; // método de pago del gasto en el modal
+let editandoId = null;  // id del gasto que se está editando (null = nuevo)
+
+// Migración: gastos antiguos guardaban solo { yen } → { amount, cur }
+gastos = gastos.map(g => g.cur ? g : {
+  id: g.id, amount: g.yen, cur: "yen", cat: g.cat, concepto: g.concepto, fecha: g.fecha
+});
+// Congela el cambio de cada gasto existente (para que no varíe al tocar el cambio global)
+let _stamp = false;
+gastos = gastos.map(g => (g.rate && g.rate > 0) ? g : (_stamp = true, { ...g, rate: cfg.rate }));
+if (_stamp) guardar();
+
+function cargar(key, def) {
+  try { const v = JSON.parse(localStorage.getItem(key)); return v ?? def; }
+  catch { return def; }
+}
+function guardar() {
+  localStorage.setItem(LS_GASTOS, JSON.stringify(gastos));
+  localStorage.setItem(LS_CFG, JSON.stringify(cfg));
+}
+
+// ---- Formateo ----
+const fmtYen = n => "¥" + Math.round(n).toLocaleString("es-ES");
+const fmtEur = n => n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+const yenAEur = yen => (cfg.rate > 0 ? yen / cfg.rate : 0);
+
+// Cambio propio de cada gasto (congelado al crearlo); si falta, el global actual
+const rateDe = g => (g.rate && g.rate > 0) ? g.rate : cfg.rate;
+
+// Valor de un gasto en cada moneda, según con cuál se registró y su propio cambio
+const yenDe = g => g.cur === "eur" ? g.amount * rateDe(g) : g.amount;
+const eurDe = g => g.cur === "eur" ? g.amount : (rateDe(g) > 0 ? g.amount / rateDe(g) : 0);
+
+function fechaBonita(iso) {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+}
+
+// ---- Render ----
+function render() {
+  const totalYen = gastos.reduce((s, g) => s + yenDe(g), 0);
+  const totalEur = gastos.reduce((s, g) => s + eurDe(g), 0);
+  document.getElementById("totalBig").textContent = fmtEur(totalEur);
+  document.getElementById("totalSmall").textContent = fmtYen(totalYen);
+
+  // Media por día: solo gasto diario (excluye vuelos y alojamiento)
+  const media = mediaPorDia();
+  document.getElementById("mediaDia").textContent = fmtEur(yenAEur(media));
+  document.getElementById("mediaDiaSmall").textContent = media ? fmtYen(media) + " /día" : "";
+
+  // Chips: costes fijos y presupuesto restante
+  const fijosYen = gastos.filter(esFijo).reduce((s, g) => s + yenDe(g), 0);
+  const fijosEur = gastos.filter(esFijo).reduce((s, g) => s + eurDe(g), 0);
+  let chips = "";
+  if (fijosYen > 0)
+    chips += `<span class="chip">✈️🏨 Fijos: <b>${fmtEur(fijosEur)}</b> · ${fmtYen(fijosYen)}</span>`;
+  if (cfg.presupuesto && cfg.presupuesto > 0) {
+    const rest = cfg.presupuesto - totalEur;
+    chips += `<span class="chip ${rest < 0 ? "neg" : ""}">Presupuesto restante: <b>${fmtEur(rest)}</b>${rest < 0 ? " ⚠️" : ""}</span>`;
+    if (cfg.inicio && cfg.fin) {
+      const objDia = (cfg.presupuesto - fijosEur) / diasViaje();
+      if (objDia > 0)
+        chips += `<span class="chip">🎯 Objetivo/día: <b>${fmtEur(objDia)}</b></span>`;
+    }
+  }
+  document.getElementById("chipsResumen").innerHTML = chips;
+
+  // Subtítulo: rango del viaje si está fijado, si no nº de gastos/días
+  if (cfg.inicio && cfg.fin) {
+    const dv = diasViaje();
+    document.getElementById("subtitulo").textContent =
+      `${fechaBonita(cfg.inicio)} – ${fechaBonita(cfg.fin)} · ${dv} día${dv !== 1 ? "s" : ""}`;
+  } else {
+    const dias = diasSet(gastos);
+    document.getElementById("subtitulo").textContent =
+      gastos.length ? `${gastos.length} gastos · ${dias} día${dias !== 1 ? "s" : ""}` : "Añade tu primer gasto";
+  }
+
+  renderCategorias(totalYen);
+  renderLista();
+
+  document.getElementById("cfgRate").value = cfg.rate;
+  document.getElementById("cfgPresu").value = cfg.presupuesto ?? "";
+  document.getElementById("cfgInicio").value = cfg.inicio || "";
+  document.getElementById("cfgFin").value = cfg.fin || "";
+  document.getElementById("cfgFin").min = cfg.inicio || "";
+}
+
+const diasSet = arr => new Set(arr.map(g => g.fecha)).size;
+
+// Nº de días del viaje: rango del calendario si está fijado; si no, días con gasto diario
+function diasViaje() {
+  if (cfg.inicio && cfg.fin) {
+    const a = new Date(cfg.inicio + "T00:00:00");
+    const b = new Date(cfg.fin + "T00:00:00");
+    const d = Math.floor((b - a) / 86400000) + 1;
+    if (d >= 1) return d;
+  }
+  return diasSet(gastos.filter(g => !esFijo(g)));
+}
+
+// Media diaria = gasto NO fijo repartido entre los días del viaje
+function mediaPorDia() {
+  const diarios = gastos.filter(g => !esFijo(g));
+  const d = diasViaje();
+  return d ? diarios.reduce((s, g) => s + yenDe(g), 0) / d : 0;
+}
+
+function renderCategorias(totalYen) {
+  const cont = document.getElementById("barraCat");
+  const card = document.getElementById("cardCategorias");
+  if (!gastos.length) { card.style.display = "none"; return; }
+  card.style.display = "block";
+
+  const porCat = {};
+  gastos.forEach(g => { porCat[g.cat] = (porCat[g.cat] || 0) + yenDe(g); });
+  const orden = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
+  const max = orden.length ? orden[0][1] : 1;
+
+  cont.innerHTML = orden.map(([id, yen]) => {
+    const c = catById(id);
+    const pct = max ? Math.max(6, (yen / max) * 100) : 0;
+    return `<div class="cat-row">
+      <span class="emoji">${c.emoji}</span>
+      <div class="barbg">
+        <div class="nombre">${c.nombre}</div>
+        <div class="bar" style="width:${pct}%"></div>
+      </div>
+      <span class="cifra">${fmtYen(yen)}</span>
+    </div>`;
+  }).join("");
+}
+
+function renderLista() {
+  const cont = document.getElementById("lista");
+  if (!gastos.length) {
+    cont.innerHTML = `<div class="vacio">Aún no hay gastos.<br>Pulsa <b>＋ Añadir gasto</b> para empezar.</div>`;
+    return;
+  }
+  const orden = [...gastos].sort((a, b) => (b.fecha + b.id).localeCompare(a.fecha + a.id));
+  cont.innerHTML = orden.map(g => {
+    const c = catById(g.cat);
+    const concepto = g.concepto || c.nombre;
+    return `<div class="item" onclick="abrirModal('${g.id}')">
+      <span class="emoji">${c.emoji}</span>
+      <div class="info">
+        <div class="concepto">${escapar(concepto)}</div>
+        <div class="meta">${fechaBonita(g.fecha)} · ${c.nombre}${g.pago === "efectivo" ? ' · <span class="ef">💵 Efectivo</span>' : ""}</div>
+      </div>
+      <div class="montos">
+        <div class="yen">${fmtEur(eurDe(g))}</div>
+        <div class="eur">${fmtYen(yenDe(g))}</div>
+      </div>
+      <button class="del" onclick="event.stopPropagation(); borrarGasto('${g.id}')" aria-label="Borrar">✕</button>
+    </div>`;
+  }).join("");
+}
+
+function escapar(s) {
+  return String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+}
+
+// ---- Modal ----
+function abrirModal(id) {
+  const g = id ? gastos.find(x => x.id === id) : null;
+  editandoId = g ? g.id : null;
+  document.querySelector(".modal h3").textContent = g ? "Editar gasto" : "Nuevo gasto";
+  catSeleccionada = g ? g.cat : "comida";
+  setMoneda(g ? g.cur : "yen");
+  setPago(g ? (g.pago || "tarjeta") : "tarjeta");
+  document.getElementById("inpMonto").value = g ? g.amount : "";
+  document.getElementById("inpRate").value = g ? rateDe(g) : cfg.rate;
+  document.getElementById("inpConcepto").value = g ? (g.concepto || "") : "";
+  document.getElementById("inpFecha").value = g ? g.fecha : hoyISO();
+  actualizarConv();
+  renderChips();
+  document.getElementById("overlay").classList.add("abierto");
+  if (!g) setTimeout(() => document.getElementById("inpMonto").focus(), 100);
+}
+
+function setMoneda(m) {
+  monedaSel = m;
+  document.getElementById("btnYen").classList.toggle("sel", m === "yen");
+  document.getElementById("btnEur").classList.toggle("sel", m === "eur");
+  actualizarConv();
+}
+
+function setPago(m) {
+  pagoSel = m;
+  document.getElementById("btnTarjeta").classList.toggle("sel", m === "tarjeta");
+  document.getElementById("btnEfectivo").classList.toggle("sel", m === "efectivo");
+}
+
+function actualizarConv() {
+  const v = parseFloat(document.getElementById("inpMonto").value);
+  const r = parseFloat(document.getElementById("inpRate").value) || cfg.rate;
+  const hint = document.getElementById("convHint");
+  if (!(v > 0) || !(r > 0)) { hint.textContent = ""; return; }
+  hint.textContent = "≈ " + (monedaSel === "yen" ? fmtEur(v / r) : fmtYen(v * r));
+}
+function cerrarModal() {
+  document.getElementById("overlay").classList.remove("abierto");
+}
+function hoyISO() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+function renderChips() {
+  document.getElementById("catsGrid").innerHTML = CATEGORIAS.map(c =>
+    `<div class="cat-chip ${c.id === catSeleccionada ? "sel" : ""}" onclick="seleccionarCat('${c.id}')">
+      <span class="e">${c.emoji}</span><span>${c.nombre}</span>
+    </div>`
+  ).join("");
+}
+function seleccionarCat(id) { catSeleccionada = id; renderChips(); }
+
+function guardarGasto() {
+  const v = parseFloat(document.getElementById("inpMonto").value);
+  if (!v || v <= 0) { document.getElementById("inpMonto").focus(); return; }
+  const r = parseFloat(document.getElementById("inpRate").value);
+  const datos = {
+    amount: monedaSel === "yen" ? Math.round(v) : Math.round(v * 100) / 100,
+    cur: monedaSel,
+    pago: pagoSel,
+    rate: (r && r > 0) ? r : cfg.rate,
+    cat: catSeleccionada,
+    concepto: document.getElementById("inpConcepto").value.trim(),
+    fecha: document.getElementById("inpFecha").value || hoyISO(),
+  };
+  if (editandoId) {
+    const g = gastos.find(x => x.id === editandoId);
+    if (g) Object.assign(g, datos);
+  } else {
+    gastos.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ...datos });
+  }
+  guardar();
+  cerrarModal();
+  render();
+}
+
+function borrarGasto(id) {
+  if (!confirm("¿Borrar este gasto?")) return;
+  gastos = gastos.filter(g => g.id !== id);
+  guardar(); render();
+}
+
+function borrarTodo() {
+  if (!gastos.length) return;
+  if (!confirm("¿Borrar TODOS los gastos? No se puede deshacer.")) return;
+  gastos = [];
+  guardar(); render();
+}
+
+// ---- Config live ----
+document.getElementById("cfgRate").addEventListener("input", e => {
+  const v = parseFloat(e.target.value);
+  if (v > 0) { cfg.rate = v; guardar(); render(); }
+});
+document.getElementById("cfgPresu").addEventListener("input", e => {
+  const v = parseFloat(e.target.value);
+  cfg.presupuesto = (v > 0) ? v : null;
+  guardar(); render();
+});
+document.getElementById("cfgInicio").addEventListener("change", e => {
+  cfg.inicio = e.target.value || null;
+  if (cfg.fin && cfg.inicio && cfg.fin < cfg.inicio) cfg.fin = null; // fin no puede ser anterior al inicio
+  guardar(); render();
+});
+document.getElementById("cfgFin").addEventListener("change", e => {
+  cfg.fin = e.target.value || null;
+  guardar(); render();
+});
+
+// Conversión en vivo al teclear importe o cambiar el tipo de cambio
+document.getElementById("inpMonto").addEventListener("input", actualizarConv);
+document.getElementById("inpRate").addEventListener("input", actualizarConv);
+
+// Cerrar modal al tocar fuera
+document.getElementById("overlay").addEventListener("click", e => {
+  if (e.target.id === "overlay") cerrarModal();
+});
+
+// ---- Export CSV ----
+function exportarCSV() {
+  if (!gastos.length) { alert("No hay gastos que exportar."); return; }
+  const filas = [["Fecha", "Categoria", "Concepto", "Metodo", "Pagado_en", "Cambio", "Yen", "Euro"]];
+  [...gastos].sort((a, b) => a.fecha.localeCompare(b.fecha)).forEach(g => {
+    filas.push([g.fecha, catById(g.cat).nombre, g.concepto || "",
+      g.pago === "efectivo" ? "Efectivo" : "Tarjeta",
+      g.cur === "eur" ? "EUR" : "JPY", rateDe(g), Math.round(yenDe(g)), eurDe(g).toFixed(2)]);
+  });
+  const csv = filas.map(f => f.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "gastos-japon.csv";
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ---- Init ----
+render();
+
+// Registrar el service worker (solo funciona servido por http/https, no en file://)
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
